@@ -1,0 +1,29 @@
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Posting:
+    """倒排表中的一条记录：某个文档对某个词条的贡献。"""
+
+    doc_id: int
+    tf: int = 1
+
+
+class IndexLoadError(Exception):
+    """索引文件缺失或损坏时抛出。"""
+
+
+class InvertedIndex:
+    def __init__(self) -> None:
+        raise NotImplementedError("待实现：见 tests/test_index_store.py")
+
+    def add(self, doc_id: int, text: str) -> None: ...
+    def remove(self, doc_id: int) -> None: ...
+    def update(self, doc_id: int, text: str) -> None: ...
+    def postings(self, term: str) -> list[Posting]: ...
+    def doc_count(self) -> int: ...
+    def doc_length(self, doc_id: int) -> int: ...
+    def doc_terms(self, doc_id: int) -> set[str]: ...
+    def save(self, path) -> None: ...
+    @classmethod
+    def load(cls, path) -> "InvertedIndex": ...
