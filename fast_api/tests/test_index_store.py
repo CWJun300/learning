@@ -1,8 +1,23 @@
 """InvertedIndex 行为约定（先于实现编写）。"""
 
+from pathlib import Path
+from uuid import uuid4
+
 import pytest
 
 from app.services.index_store import IndexLoadError, InvertedIndex
+
+# 持久化用例的文件落在项目内的 _files 目录，避免依赖系统临时目录
+FILES_DIR = Path(__file__).resolve().parent / "_files"
+
+
+@pytest.fixture
+def index_file():
+    FILES_DIR.mkdir(parents=True, exist_ok=True)
+    path = FILES_DIR / f"index_{uuid4().hex}.json"
+    yield path
+    if path.exists():
+        path.unlink()
 
 
 def make_index() -> InvertedIndex:
@@ -76,31 +91,28 @@ class TestRemoveAndUpdate:
 
 
 class TestPersistence:
-    def test_save_then_load_roundtrip(self, tmp_path):
+    def test_save_then_load_roundtrip(self, index_file):
         idx = make_index()
-        path = tmp_path / "index.json"
-        idx.save(path)
+        idx.save(index_file)
 
-        loaded = InvertedIndex.load(path)
+        loaded = InvertedIndex.load(index_file)
         assert loaded.doc_count() == idx.doc_count()
         assert {p.doc_id: p.tf for p in loaded.postings("苹果")} == {1: 1, 2: 2}
         assert loaded.doc_length(2) == 3
         assert loaded.doc_terms(3) == {"西瓜"}
 
-    def test_load_missing_file_raises(self, tmp_path):
+    def test_load_missing_file_raises(self, index_file):
         with pytest.raises(IndexLoadError):
-            InvertedIndex.load(tmp_path / "no_such_index.json")
+            InvertedIndex.load(index_file)
 
-    def test_load_corrupted_file_raises(self, tmp_path):
-        path = tmp_path / "broken.json"
-        path.write_text("{ not valid json", encoding="utf-8")
+    def test_load_corrupted_file_raises(self, index_file):
+        index_file.write_text("{ not valid json", encoding="utf-8")
         with pytest.raises(IndexLoadError):
-            InvertedIndex.load(path)
+            InvertedIndex.load(index_file)
 
-    def test_load_empty_index_file(self, tmp_path):
+    def test_load_empty_index_file(self, index_file):
         idx = InvertedIndex()
-        path = tmp_path / "empty.json"
-        idx.save(path)
-        loaded = InvertedIndex.load(path)
+        idx.save(index_file)
+        loaded = InvertedIndex.load(index_file)
         assert loaded.doc_count() == 0
         assert loaded.postings("苹果") == []

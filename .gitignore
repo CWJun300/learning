@@ -13,8 +13,10 @@ htmlcov/
 
 # 运行产物
 data/index.json
+tests/_files/
 *.db
 *.log
+.pytest_tmp/
 
 # 前端
 node_modules/
