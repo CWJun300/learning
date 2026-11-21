@@ -31,13 +31,13 @@ async function loadNotes() {
   }
 }
 
-async function loadSidebar() {
+async function loadMeta() {
   try {
     const [tagList, statData] = await Promise.all([listTags(), getStats()])
     tags.value = tagList
     stats.value = statData
   } catch {
-    // 侧边栏失败不影响主列表
+    // 标签/统计失败不影响列表
   }
 }
 
@@ -57,165 +57,95 @@ function formatDate(value) {
   return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
-function openNote(id) {
-  router.push(`/notes/${id}`)
-}
-
 onMounted(() => {
   loadNotes()
-  loadSidebar()
+  loadMeta()
 })
 </script>
 
 <template>
-  <div class="layout">
-    <aside class="sidebar">
-      <el-card shadow="never" class="stat-card">
-        <div class="stat-row">
-          <span class="stat-num">{{ stats?.note_count ?? '-' }}</span>
-          <span class="stat-label">篇笔记</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-num">{{ stats?.term_count ?? '-' }}</span>
-          <span class="stat-label">个词条</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-num">{{ stats?.avg_note_length ?? '-' }}</span>
-          <span class="stat-label">平均词数</span>
-        </div>
-      </el-card>
+  <div class="list-page">
+    <div class="page-head">
+      <h2 class="title">
+        全部笔记
+        <span v-if="activeTag" class="title-tag">#{{ activeTag }}</span>
+      </h2>
+      <span v-if="stats" class="meta">
+        {{ stats.note_count }} 篇 · {{ stats.term_count }} 个词条 · 平均 {{ stats.avg_note_length }} 词
+      </span>
+    </div>
 
-      <el-card shadow="never" class="tag-card">
-        <template #header>
-          <div class="card-header">
-            <span>标签</span>
-            <el-button v-if="activeTag" link type="primary" @click="selectTag(activeTag)">
-              清除
-            </el-button>
+    <div v-if="tags.length" class="tag-row">
+      <el-tag
+        v-for="tag in tags"
+        :key="tag.name"
+        :type="activeTag === tag.name ? 'primary' : 'info'"
+        :effect="activeTag === tag.name ? 'dark' : 'plain'"
+        class="tag-chip"
+        @click="selectTag(tag.name)"
+      >
+        {{ tag.name }} · {{ tag.count }}
+      </el-tag>
+      <el-button v-if="activeTag" link type="primary" @click="selectTag(activeTag)">
+        清除筛选
+      </el-button>
+    </div>
+
+    <el-skeleton v-if="loading" :rows="4" animated />
+
+    <template v-else>
+      <el-empty v-if="!notes.length" description="还没有笔记">
+        <el-button type="primary" @click="router.push('/notes/new')">去写第一篇</el-button>
+      </el-empty>
+
+      <div v-else class="note-grid">
+        <el-card
+          v-for="note in notes"
+          :key="note.id"
+          class="note-card"
+          shadow="hover"
+          @click="router.push(`/notes/${note.id}`)"
+        >
+          <div class="note-title">{{ note.title }}</div>
+          <div class="note-excerpt">
+            {{ (note.content || '（无正文）').slice(0, 120) }}
           </div>
-        </template>
-        <el-empty v-if="!tags.length" description="暂无标签" :image-size="60" />
-        <div v-else class="tag-list">
-          <el-tag
-            v-for="tag in tags"
-            :key="tag.name"
-            :type="activeTag === tag.name ? 'primary' : 'info'"
-            :effect="activeTag === tag.name ? 'dark' : 'plain'"
-            class="tag-item"
-            @click="selectTag(tag.name)"
-          >
-            {{ tag.name }} · {{ tag.count }}
-          </el-tag>
-        </div>
-      </el-card>
-    </aside>
-
-    <section class="content">
-      <div class="toolbar">
-        <h2 class="title">
-          全部笔记
-          <span v-if="activeTag" class="title-tag">#{{ activeTag }}</span>
-        </h2>
-        <el-button type="primary" @click="router.push('/notes/new')">新建笔记</el-button>
+          <div class="note-footer">
+            <div class="note-tags">
+              <el-tag v-for="tag in note.tags" :key="tag.id" size="small" type="info">
+                {{ tag.name }}
+              </el-tag>
+            </div>
+            <span class="note-date">{{ formatDate(note.updated_at) }}</span>
+          </div>
+        </el-card>
       </div>
 
-      <el-skeleton v-if="loading" :rows="4" animated />
-
-      <template v-else>
-        <el-empty v-if="!notes.length" description="还没有笔记，去写第一篇吧" />
-
-        <div v-else class="note-grid">
-          <el-card
-            v-for="note in notes"
-            :key="note.id"
-            class="note-card"
-            shadow="hover"
-            @click="openNote(note.id)"
-          >
-            <div class="note-title">{{ note.title }}</div>
-            <div class="note-excerpt">
-              {{ (note.content || '（无正文）').slice(0, 120) }}
-            </div>
-            <div class="note-footer">
-              <div class="note-tags">
-                <el-tag v-for="tag in note.tags" :key="tag.id" size="small" type="info">
-                  {{ tag.name }}
-                </el-tag>
-              </div>
-              <span class="note-date">{{ formatDate(note.updated_at) }}</span>
-            </div>
-          </el-card>
-        </div>
-
-        <el-pagination
-          v-if="total > size"
-          class="pager"
-          background
-          layout="prev, pager, next, total"
-          :total="total"
-          :page-size="size"
-          :current-page="page"
-          @current-change="changePage"
-        />
-      </template>
-    </section>
+      <el-pagination
+        v-if="total > size"
+        class="pager"
+        background
+        layout="prev, pager, next, total"
+        :total="total"
+        :page-size="size"
+        :current-page="page"
+        @current-change="changePage"
+      />
+    </template>
   </div>
 </template>
 
 <style scoped>
-.layout {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-.sidebar {
-  width: 220px;
-  flex: 0 0 220px;
+.list-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
-.content {
-  flex: 1;
-  min-width: 0;
-}
-.stat-card :deep(.el-card__body) {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.stat-row {
+.page-head {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-}
-.stat-num {
-  font-size: 20px;
-  font-weight: 600;
-  color: #409eff;
-}
-.stat-label {
-  font-size: 12px;
-  color: #909399;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.tag-list {
-  display: flex;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 6px;
-}
-.tag-item {
-  cursor: pointer;
-}
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
 }
 .title {
   margin: 0;
@@ -225,6 +155,19 @@ onMounted(() => {
   color: #409eff;
   font-size: 14px;
   margin-left: 6px;
+}
+.meta {
+  font-size: 12px;
+  color: #a8abb2;
+}
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tag-chip {
+  cursor: pointer;
 }
 .note-grid {
   display: grid;
@@ -270,7 +213,7 @@ onMounted(() => {
   white-space: nowrap;
 }
 .pager {
-  margin-top: 16px;
+  margin-top: 8px;
   justify-content: center;
 }
 </style>
