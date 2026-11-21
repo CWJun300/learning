@@ -12,26 +12,9 @@ from app.db import get_db
 from app.models import Note, Tag
 from app.schemas import NoteCreate, NoteOut, NoteUpdate, PageOut
 from app.services.index_manager import index_manager
+from app.services.tagging import resolve_tags
 
 router = APIRouter(prefix="/api/notes", tags=["笔记"])
-
-
-def _resolve_tags(db: Session, names: list[str]) -> list[Tag]:
-    """按名字取标签，不存在则新建。去重并保持顺序。"""
-    cleaned = [n.strip() for n in names if n and n.strip()]
-    if not cleaned:
-        return []
-    unique = list(dict.fromkeys(cleaned))
-    existing = {t.name: t for t in db.scalars(select(Tag).where(Tag.name.in_(unique))).all()}
-    tags: list[Tag] = []
-    for name in unique:
-        tag = existing.get(name)
-        if tag is None:
-            tag = Tag(name=name)
-            db.add(tag)
-            db.flush()
-        tags.append(tag)
-    return tags
 
 
 @router.get("", response_model=PageOut[NoteOut], summary="笔记列表（分页 + 标签过滤）")
@@ -62,7 +45,7 @@ def list_notes(
 )
 def create_note(payload: NoteCreate, db: Session = Depends(get_db)) -> Note:
     note = Note(title=payload.title, content=payload.content)
-    note.tags = _resolve_tags(db, payload.tags)
+    note.tags = resolve_tags(db, payload.tags)
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -90,7 +73,7 @@ def update_note(note_id: int, payload: NoteUpdate, db: Session = Depends(get_db)
     if payload.content is not None:
         note.content = payload.content
     if payload.tags is not None:
-        note.tags = _resolve_tags(db, payload.tags)
+        note.tags = resolve_tags(db, payload.tags)
 
     db.commit()
     db.refresh(note)

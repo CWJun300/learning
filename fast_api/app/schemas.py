@@ -64,6 +64,29 @@ class StatsOut(BaseModel):
     avg_note_length: float
 
 
+class ImportFileIn(BaseModel):
+    """前端读取到的单个文件内容。"""
+
+    name: str = Field(min_length=1, max_length=260)
+    content: str = ""
+
+
+class ImportRequest(BaseModel):
+    files: list[ImportFileIn] = Field(default_factory=list)
+
+
+class ImportFailure(BaseModel):
+    name: str
+    reason: str
+
+
+class ImportResult(BaseModel):
+    imported: int
+    skipped: int
+    failed: list[ImportFailure] = Field(default_factory=list)
+    titles: list[str] = Field(default_factory=list)
+
+
 class ErrorOut(BaseModel):
     code: int
     message: str

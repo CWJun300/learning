@@ -22,3 +22,6 @@ export const getRelated = (id, topK = 5) =>
   http.get(`/notes/${id}/related`, { params: { top_k: topK } })
 
 export const getHealth = () => http.get('/health')
+
+/** 批量导入：files = [{ name, content }] */
+export const importNotes = (files) => http.post('/notes/import', { files })

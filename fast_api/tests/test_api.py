@@ -216,3 +216,41 @@ class TestPartialWordSearch:
         create_note(client, "带标签的笔记", "正文无关", tags=["MySQL"])
         body = client.get("/api/search", params={"q": "sql"}).json()
         assert body["total"] >= 1
+
+
+class TestImport:
+    def _payload(self, *files):
+        return {"files": [{"name": name, "content": content} for name, content in files]}
+
+    def test_import_markdown_file(self, client):
+        body = client.post(
+            "/api/notes/import",
+            json=self._payload(("数据库.md", "# MySQL 索引\n\n索引能加速查询")),
+        ).json()
+        assert body["imported"] == 1
+        assert body["titles"] == ["MySQL 索引"]
+
+        found = client.get("/api/search", params={"q": "索引"}).json()
+        assert found["total"] >= 1
+
+    def test_import_json_batch(self, client):
+        payload = '[{"title": "批量A", "content": "aaa"}, {"title": "批量B", "content": "bbb", "tags": ["导入"]}]'
+        body = client.post("/api/notes/import", json=self._payload(("b.json", payload))).json()
+        assert body["imported"] == 2
+        tags = {item["name"] for item in client.get("/api/tags").json()}
+        assert "导入" in tags
+
+    def test_duplicate_title_is_skipped(self, client):
+        client.post("/api/notes/import", json=self._payload(("a.md", "# 重复标题\n正文")))
+        body = client.post("/api/notes/import", json=self._payload(("a.md", "# 重复标题\n正文"))).json()
+        assert body["imported"] == 0
+        assert body["skipped"] == 1
+
+    def test_bad_json_reports_failure(self, client):
+        body = client.post("/api/notes/import", json=self._payload(("bad.json", "{ not json"))).json()
+        assert body["imported"] == 0
+        assert body["failed"][0]["name"] == "bad.json"
+
+    def test_empty_file_list(self, client):
+        body = client.post("/api/notes/import", json={"files": []}).json()
+        assert body["imported"] == 0

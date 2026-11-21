@@ -59,6 +59,10 @@ onMounted(async () => {
           新建
         </router-link>
 
+        <router-link class="nav-item" :class="{ active: route.path === '/import' }" to="/import">
+          导入
+        </router-link>
+
         <router-link class="nav-item" :class="{ active: notesActive }" to="/">
           笔记
         </router-link>

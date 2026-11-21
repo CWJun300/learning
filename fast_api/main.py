@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
-from app.api import health, notes, search, tags
+from app.api import health, imports, notes, search, tags
 from app.config import settings
 from app.db import SessionLocal
 from app.models import Note, Tag
@@ -77,6 +77,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(notes.router)
+app.include_router(imports.router)
 app.include_router(search.router)
 app.include_router(tags.router)
 
