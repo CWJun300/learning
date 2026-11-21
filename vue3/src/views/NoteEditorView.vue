@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { createNote, getNote, listTags, updateNote } from '@/api/notes'
 import MarkdownView from '@/components/MarkdownView.vue'
@@ -16,8 +16,7 @@ const knownTags = ref([])
 const loading = ref(false)
 const saving = ref(false)
 
-const pickerOpen = ref(false)
-const newTag = ref('')
+const NEW_TAG = '__new_tag__'
 
 const isEdit = computed(() => Boolean(props.id))
 
@@ -29,24 +28,35 @@ async function loadTags() {
   }
 }
 
-/** 选中一个标签：加到列表里，并关闭面板（要再加就再点按钮） */
+/** 选中一个标签：加到列表里（下拉菜单点完会自动关闭） */
 function addTag(name) {
   const value = (name || '').trim()
   if (value && !form.tags.includes(value)) {
     form.tags.push(value)
   }
-  pickerOpen.value = false
 }
 
-/** 面板底部新建标签 */
-function addNewTag() {
-  const value = newTag.value.trim()
-  if (!value) {
-    pickerOpen.value = false
+/** 下拉菜单命令分发 */
+async function onCommand(command) {
+  if (command === NEW_TAG) {
+    try {
+      const { value } = await ElMessageBox.prompt('输入新标签名称', '新建标签', {
+        confirmButtonText: '添加',
+        cancelButtonText: '取消',
+        inputPlaceholder: '例如：检索、MySQL',
+        inputValidator: (text) => (text && text.trim() ? true : '标签不能为空'),
+      })
+      addTag(value)
+      // 让新标签下次也能出现在菜单里
+      if (value && !knownTags.value.includes(value.trim())) {
+        knownTags.value.push(value.trim())
+      }
+    } catch {
+      // 用户取消
+    }
     return
   }
-  addTag(value)
-  newTag.value = ''
+  addTag(command)
 }
 
 function removeTag(name) {
@@ -132,48 +142,23 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 标签：按钮触发，面板里点选；标签块显示在面板外 -->
+    <!-- 标签：下拉菜单选一个就关闭；已选标签显示在菜单外 -->
     <div class="tag-block">
       <div class="tag-line">
         <span class="tag-label">标签</span>
 
-        <el-popover
-          v-model:visible="pickerOpen"
-          placement="bottom-start"
-          :width="260"
-          trigger="click"
-          popper-class="tag-picker-popper"
-        >
-          <template #reference>
-            <el-button class="tag-picker-btn">请选择标签</el-button>
-          </template>
-
-          <div class="picker">
-            <div class="picker-list">
-              <div
-                v-for="name in knownTags"
-                :key="name"
-                class="picker-item"
-                :class="{ picked: form.tags.includes(name) }"
-                @click="addTag(name)"
-              >
+        <el-dropdown trigger="click" @command="onCommand">
+          <el-button class="tag-picker-btn">请选择标签</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="name in knownTags" :key="name" :command="name">
                 {{ name }}
-                <span v-if="form.tags.includes(name)" class="picker-check">已选</span>
-              </div>
-              <div v-if="!knownTags.length" class="picker-empty">暂无标签，可在下方新建</div>
-            </div>
-
-            <div class="picker-new">
-              <el-input
-                v-model="newTag"
-                size="small"
-                placeholder="新建标签"
-                @keyup.enter="addNewTag"
-              />
-              <el-button size="small" type="primary" @click="addNewTag">添加</el-button>
-            </div>
-          </div>
-        </el-popover>
+              </el-dropdown-item>
+              <el-dropdown-item v-if="!knownTags.length" disabled>暂无标签</el-dropdown-item>
+              <el-dropdown-item :command="NEW_TAG" divided>＋ 新建标签</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
 
       <div v-if="form.tags.length" class="tag-chips">
@@ -259,50 +244,6 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   min-height: 24px;
   padding-left: 42px;
-}
-
-/* ---------- 弹出面板 ---------- */
-.picker {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.picker-list {
-  max-height: 220px;
-  overflow-y: auto;
-}
-.picker-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.picker-item:hover {
-  background: #f5f7fa;
-  color: #409eff;
-}
-.picker-item.picked {
-  color: #409eff;
-  font-weight: 600;
-}
-.picker-check {
-  font-size: 11px;
-  color: #a8abb2;
-  font-weight: 400;
-}
-.picker-empty {
-  font-size: 12px;
-  color: #c0c4cc;
-  padding: 6px 8px;
-}
-.picker-new {
-  display: flex;
-  gap: 6px;
-  border-top: 1px solid #f0f2f5;
-  padding-top: 8px;
 }
 
 /* ---------- 编辑与预览 ---------- */
