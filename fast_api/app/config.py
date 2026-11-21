@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     app_name: str = "个人知识库"
     app_version: str = "0.1.0"
 
+    # 开发期热重载开关：设 RELOAD=1 打开（默认关闭，避免多进程带来的额外问题）
+    reload: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8000
+
     # 数据库：默认 MySQL，可切换成 sqlite:///./kb.db 用于应急演示
     database_url: str = "mysql+pymysql://root:@127.0.0.1:3306/kb_db?charset=utf8mb4"
     test_database_url: str = "mysql+pymysql://root:@127.0.0.1:3306/kb_test?charset=utf8mb4"

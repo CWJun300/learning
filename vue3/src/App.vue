@@ -1,15 +1,24 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import http from './api/http.js'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+import { getHealth } from '@/api/notes'
+
+const router = useRouter()
+const keyword = ref('')
 const health = ref(null)
-const error = ref('')
+
+function submit() {
+  const q = keyword.value.trim()
+  if (!q) return
+  router.push({ name: 'search', query: { q } })
+}
 
 onMounted(async () => {
   try {
-    health.value = await http.get('/health')
-  } catch (e) {
-    error.value = e.message
+    health.value = await getHealth()
+  } catch {
+    health.value = null
   }
 })
 </script>
@@ -17,17 +26,29 @@ onMounted(async () => {
 <template>
   <el-container class="app-shell">
     <el-header class="app-header">
-      <div class="brand">📚 个人知识库</div>
-      <div class="status">
-        <el-tag v-if="health" :type="health.db === 'ok' ? 'success' : 'danger'" size="small">
-          后端 {{ health.status }} / 数据库 {{ health.db }} / 索引 {{ health.index_docs }} 篇
+      <div class="brand" @click="router.push('/')">📚 个人知识库</div>
+
+      <el-input
+        v-model="keyword"
+        class="search-box"
+        placeholder="搜索笔记…（支持 +必含词 / 短语 / #标签）"
+        clearable
+        @keyup.enter="submit"
+      >
+        <template #append>
+          <el-button @click="submit">搜索</el-button>
+        </template>
+      </el-input>
+
+      <div class="header-right">
+        <el-button type="primary" @click="router.push('/notes/new')">新建</el-button>
+        <el-tag v-if="health" :type="health.db === 'ok' ? 'success' : 'warning'" size="small">
+          {{ health.db === 'ok' ? `已连接 · ${health.index_docs} 篇` : '数据库未连接' }}
         </el-tag>
-        <el-tag v-else-if="error" type="danger" size="small">连不上后端：{{ error }}</el-tag>
-        <el-tag v-else type="info" size="small">连接中…</el-tag>
       </div>
     </el-header>
 
-    <el-main>
+    <el-main class="app-main">
       <router-view />
     </el-main>
   </el-container>
@@ -41,23 +62,42 @@ body,
   margin: 0;
 }
 
+body {
+  background: #f5f7fa;
+}
+
 .app-shell {
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
   border-bottom: 1px solid #ebeef5;
 }
 
 .brand {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.status {
-  font-size: 12px;
+.search-box {
+  max-width: 520px;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.app-main {
+  padding: 20px 24px 40px;
 }
 </style>
