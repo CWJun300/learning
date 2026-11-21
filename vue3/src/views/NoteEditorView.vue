@@ -16,10 +16,8 @@ const knownTags = ref([])
 const loading = ref(false)
 const saving = ref(false)
 
-// 下拉框只负责"挑一个"，选中后立刻清空，标签显示在框外
-const pickedTag = ref('')
-// 每次选完换 key，强制下拉框重新挂载，确保回到「请选择标签」占位文案
-const pickKey = ref(0)
+const pickerOpen = ref(false)
+const newTag = ref('')
 
 const isEdit = computed(() => Boolean(props.id))
 
@@ -31,14 +29,24 @@ async function loadTags() {
   }
 }
 
-/** 从下拉框选中（或新建）一个标签：加进列表，并清空下拉框 */
-function addTag(value) {
-  const name = (value || '').trim()
-  if (name && !form.tags.includes(name)) {
-    form.tags.push(name)
+/** 选中一个标签：加到列表里，并关闭面板（要再加就再点按钮） */
+function addTag(name) {
+  const value = (name || '').trim()
+  if (value && !form.tags.includes(value)) {
+    form.tags.push(value)
   }
-  pickedTag.value = ''
-  pickKey.value += 1
+  pickerOpen.value = false
+}
+
+/** 面板底部新建标签 */
+function addNewTag() {
+  const value = newTag.value.trim()
+  if (!value) {
+    pickerOpen.value = false
+    return
+  }
+  addTag(value)
+  newTag.value = ''
 }
 
 function removeTag(name) {
@@ -77,7 +85,6 @@ async function save() {
     } else {
       await createNote(form.value)
       ElMessage.success('已创建')
-      // 新建成功后回到笔记列表
       router.push('/')
     }
   } catch (error) {
@@ -125,22 +132,48 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <!-- 标签：按钮触发，面板里点选；标签块显示在面板外 -->
     <div class="tag-block">
       <div class="tag-line">
         <span class="tag-label">标签</span>
 
-        <el-select
-          :key="pickKey"
-          v-model="pickedTag"
-          class="tag-select"
-          filterable
-          allow-create
-          default-first-option
-          placeholder="请选择标签"
-          @change="addTag"
+        <el-popover
+          v-model:visible="pickerOpen"
+          placement="bottom-start"
+          :width="260"
+          trigger="click"
+          popper-class="tag-picker-popper"
         >
-          <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
-        </el-select>
+          <template #reference>
+            <el-button class="tag-picker-btn">请选择标签</el-button>
+          </template>
+
+          <div class="picker">
+            <div class="picker-list">
+              <div
+                v-for="name in knownTags"
+                :key="name"
+                class="picker-item"
+                :class="{ picked: form.tags.includes(name) }"
+                @click="addTag(name)"
+              >
+                {{ name }}
+                <span v-if="form.tags.includes(name)" class="picker-check">已选</span>
+              </div>
+              <div v-if="!knownTags.length" class="picker-empty">暂无标签，可在下方新建</div>
+            </div>
+
+            <div class="picker-new">
+              <el-input
+                v-model="newTag"
+                size="small"
+                placeholder="新建标签"
+                @keyup.enter="addNewTag"
+              />
+              <el-button size="small" type="primary" @click="addNewTag">添加</el-button>
+            </div>
+          </div>
+        </el-popover>
       </div>
 
       <div v-if="form.tags.length" class="tag-chips">
@@ -198,11 +231,11 @@ onBeforeUnmount(() => {
   color: #c0c4cc;
 }
 
-/* ---------- 标签区：下拉框在上，已选标签独占一行 ---------- */
+/* ---------- 标签区 ---------- */
 .tag-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
 }
 .tag-line {
@@ -215,16 +248,61 @@ onBeforeUnmount(() => {
   color: #606266;
   white-space: nowrap;
 }
-.tag-select {
-  width: 200px;
+.tag-picker-btn {
+  min-width: 140px;
+  justify-content: space-between;
 }
 .tag-chips {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding-left: 42px;
   min-height: 24px;
+  padding-left: 42px;
+}
+
+/* ---------- 弹出面板 ---------- */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.picker-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.picker-item:hover {
+  background: #f5f7fa;
+  color: #409eff;
+}
+.picker-item.picked {
+  color: #409eff;
+  font-weight: 600;
+}
+.picker-check {
+  font-size: 11px;
+  color: #a8abb2;
+  font-weight: 400;
+}
+.picker-empty {
+  font-size: 12px;
+  color: #c0c4cc;
+  padding: 6px 8px;
+}
+.picker-new {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid #f0f2f5;
+  padding-top: 8px;
 }
 
 /* ---------- 编辑与预览 ---------- */
