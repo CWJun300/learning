@@ -71,3 +71,41 @@ class TestSearch:
 
     def test_empty_index_returns_empty_list(self):
         assert BM25Ranker(InvertedIndex()).search(["苹果"]) == []
+
+
+class TestFuzzyFallback:
+    """精确词条搜不到时，退化为「包含关系」匹配（sql -> mysql）。"""
+
+    def test_partial_word_matches_when_no_exact(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql 连接池")
+        results = BM25Ranker(idx).search(["sql"])
+        assert [doc_id for doc_id, _ in results] == [1]
+
+    def test_exact_match_takes_priority(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql")
+        idx.add(2, "sql")
+        results = BM25Ranker(idx).search(["sql"])
+        assert [doc_id for doc_id, _ in results] == [2]
+
+    def test_single_char_query_does_not_expand(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql")
+        assert BM25Ranker(idx).search(["s"]) == []
+
+    def test_short_query_does_not_expand(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql")
+        assert BM25Ranker(idx).search(["q"]) == []
+
+    def test_no_candidate_returns_empty(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql")
+        assert BM25Ranker(idx).search(["zzzz"]) == []
+
+    def test_expand_terms_helper(self):
+        idx = InvertedIndex()
+        idx.add(1, "mysql postgresql sqlite")
+        assert sorted(idx.expand_terms("sql")) == ["mysql", "postgresql", "sqlite"]
+        assert idx.expand_terms("sqlite") == ["sqlite"]

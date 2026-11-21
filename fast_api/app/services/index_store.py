@@ -87,6 +87,25 @@ class InvertedIndex:
     def terms(self) -> set[str]:
         return set(self._postings)
 
+    # 模糊匹配的最短查询长度：单字展开会命中太多噪音
+    MIN_FUZZY_LEN = 2
+
+    def expand_terms(self, term: str, min_len: int | None = None) -> list[str]:
+        """把查询词展开成相关词条。
+
+        - 精确命中：只返回它自己（保证精度）
+        - 否则返回所有**包含**它的词条（搜 "sql" 能匹配 "mysql"）
+        - 太短的查询不展开，避免噪音
+        """
+        if not term:
+            return []
+        if term in self._postings:
+            return [term]
+        limit = self.MIN_FUZZY_LEN if min_len is None else min_len
+        if len(term) < limit:
+            return []
+        return [candidate for candidate in self._postings if term in candidate]
+
     def avg_doc_length(self) -> float:
         if not self._doc_len:
             return 0.0

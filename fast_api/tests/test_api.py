@@ -196,3 +196,23 @@ class TestTagSearch:
         ids = [item["id"] for item in body["items"]]
         assert ids[0] == second
         assert set(ids) == {first, second}
+
+
+class TestPartialWordSearch:
+    """不完整的词也要能搜到（sql -> MySQL）。"""
+
+    def test_partial_ascii_word(self, client):
+        create_note(client, "数据库笔记", "MySQL 连接池配置")
+        body = client.get("/api/search", params={"q": "sql"}).json()
+        assert body["total"] >= 1
+        assert body["items"][0]["title"] == "数据库笔记"
+
+    def test_partial_chinese_word(self, client):
+        create_note(client, "中文部分匹配", "连接池参数怎么调")
+        body = client.get("/api/search", params={"q": "连接"}).json()
+        assert body["total"] >= 1
+
+    def test_partial_matches_tag_name(self, client):
+        create_note(client, "带标签的笔记", "正文无关", tags=["MySQL"])
+        body = client.get("/api/search", params={"q": "sql"}).json()
+        assert body["total"] >= 1

@@ -42,14 +42,32 @@ class BM25Ranker:
         return total
 
     def search(self, query_terms: list[str], top_k: int = 20) -> list[tuple[int, float]]:
+        """两阶段检索：先精确，精确无结果时再退化为「包含关系」匹配。
+
+        这样正常搜索的精度不受影响，而 sql / 连接 这类不完整的输入
+        也能命中 mysql / 连接池。
+        """
         if not query_terms or self.index.doc_count() == 0:
             return []
 
-        candidates: set[int] = set()
+        results = self._rank(query_terms, top_k)
+        if results:
+            return results
+
+        expanded: list[str] = []
         for term in query_terms:
+            expanded.extend(self.index.expand_terms(term))
+        expanded = list(dict.fromkeys(expanded))
+        if not expanded:
+            return []
+        return self._rank(expanded, top_k)
+
+    def _rank(self, terms: list[str], top_k: int) -> list[tuple[int, float]]:
+        candidates: set[int] = set()
+        for term in terms:
             candidates.update(p.doc_id for p in self.index.postings(term))
 
-        scored = [(doc_id, self.score(doc_id, query_terms)) for doc_id in candidates]
+        scored = [(doc_id, self.score(doc_id, terms)) for doc_id in candidates]
         scored = [item for item in scored if item[1] > 0]
         # 得分降序；得分相同时按 doc_id 升序，保证结果稳定可测
         scored.sort(key=lambda item: (-item[1], item[0]))
