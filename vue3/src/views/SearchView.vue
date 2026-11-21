@@ -106,7 +106,8 @@ onMounted(() => {
       >
         <div class="result-head">
           <span class="result-title">{{ item.title }}</span>
-          <span class="result-score">{{ item.score.toFixed(2) }}</span>
+          <!-- 纯标签检索没有文本得分，不显示 0.00 -->
+          <span v-if="item.score > 0" class="result-score">{{ item.score.toFixed(2) }}</span>
         </div>
         <!-- 已由 DOMPurify 净化，只保留 <mark> 等安全标签 -->
         <div class="result-snippet" v-html="safeSnippet(item.snippet)" />
