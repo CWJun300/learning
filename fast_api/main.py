@@ -88,6 +88,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 # ---------- 前端托管（SPA） ----------
+# index.html 必须禁缓存，否则前端重新构建后浏览器还拿旧 HTML，
+# 会去请求已被删除的旧 bundle，出现"改了页面没变化"的假象。
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
 if FRONTEND_DIST.is_dir():
     _assets = FRONTEND_DIST / "assets"
     if _assets.is_dir():
@@ -100,8 +104,8 @@ if FRONTEND_DIST.is_dir():
             raise HTTPException(status_code=404, detail="接口不存在")
         candidate = FRONTEND_DIST / full_path
         if full_path and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(FRONTEND_DIST / "index.html")
+            return FileResponse(candidate, headers=_NO_CACHE)
+        return FileResponse(FRONTEND_DIST / "index.html", headers=_NO_CACHE)
 
 
 if __name__ == "__main__":

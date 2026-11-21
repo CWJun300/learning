@@ -18,6 +18,8 @@ const saving = ref(false)
 
 // 下拉框只负责"挑一个"，选中后立刻清空，标签显示在框外
 const pickedTag = ref('')
+// 每次选完换 key，强制下拉框重新挂载，确保回到「请选择标签」占位文案
+const pickKey = ref(0)
 
 const isEdit = computed(() => Boolean(props.id))
 
@@ -36,6 +38,7 @@ function addTag(value) {
     form.tags.push(name)
   }
   pickedTag.value = ''
+  pickKey.value += 1
 }
 
 function removeTag(name) {
@@ -122,22 +125,25 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="tag-line">
-      <span class="tag-label">标签</span>
+    <div class="tag-block">
+      <div class="tag-line">
+        <span class="tag-label">标签</span>
 
-      <el-select
-        v-model="pickedTag"
-        class="tag-select"
-        filterable
-        allow-create
-        default-first-option
-        placeholder="请选择标签"
-        @change="addTag"
-      >
-        <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
-      </el-select>
+        <el-select
+          :key="pickKey"
+          v-model="pickedTag"
+          class="tag-select"
+          filterable
+          allow-create
+          default-first-option
+          placeholder="请选择标签"
+          @change="addTag"
+        >
+          <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
+        </el-select>
+      </div>
 
-      <div v-if="form.tags.length" class="selected-tags">
+      <div v-if="form.tags.length" class="tag-chips">
         <el-tag
           v-for="name in form.tags"
           :key="name"
@@ -192,12 +198,17 @@ onBeforeUnmount(() => {
   color: #c0c4cc;
 }
 
-/* ---------- 标签行：下拉框只选一个，标签显示在框外 ---------- */
+/* ---------- 标签区：下拉框在上，已选标签独占一行 ---------- */
+.tag-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
 .tag-line {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
 }
 .tag-label {
   font-size: 13px;
@@ -206,13 +217,14 @@ onBeforeUnmount(() => {
 }
 .tag-select {
   width: 200px;
-  flex: 0 0 200px;
 }
-.selected-tags {
+.tag-chips {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
+  padding-left: 42px;
+  min-height: 24px;
 }
 
 /* ---------- 编辑与预览 ---------- */
