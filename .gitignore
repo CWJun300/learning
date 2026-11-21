@@ -11,12 +11,12 @@ htmlcov/
 # 环境与密钥（示例如 .env.example 入库，真实 .env 不入库）
 .env
 
-# 运行产物
-data/index.json
-tests/_files/
+# 运行产物（索引由程序生成，不入库）
+**/data/index.json
+**/tests/_files/
+**/.pytest_tmp/
 *.db
 *.log
-.pytest_tmp/
 
 # 前端
 node_modules/
