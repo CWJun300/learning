@@ -98,7 +98,7 @@ body {
   display: grid;
   grid-template-columns: 210px 1fr 210px;
   align-items: center;
-  height: 86px;
+  height: 96px;
   padding: 0 24px;
   background: #fff;
   border-bottom: 1px solid #ebeef5;
@@ -121,6 +121,8 @@ body {
 .search-wrap {
   display: flex;
   justify-content: center;
+  /* 搜索框整体比品牌略有下沉，避免和标题挤在同一水平线上 */
+  padding-top: 12px;
 }
 
 .search-bar {
@@ -153,7 +155,7 @@ body {
 
 /* ---------- 主体 ---------- */
 .app-body {
-  height: calc(100vh - 86px);
+  height: calc(100vh - 96px);
 }
 
 .nav-aside {

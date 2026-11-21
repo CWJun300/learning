@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
@@ -9,13 +9,15 @@ import { searchNotes } from '@/api/notes'
 const route = useRoute()
 const router = useRouter()
 
-const keyword = ref('')
 const results = ref([])
 const total = ref(0)
 const page = ref(1)
 const size = 10
 const loading = ref(false)
 const elapsed = ref(0)
+
+/** 关键词直接取自地址栏（搜索框在顶栏，全站唯一） */
+const keyword = computed(() => (route.query.q || '').toString())
 
 async function runSearch() {
   const q = keyword.value.trim()
@@ -38,12 +40,6 @@ async function runSearch() {
   }
 }
 
-function submit() {
-  page.value = 1
-  router.replace({ name: 'search', query: { q: keyword.value } })
-  runSearch()
-}
-
 function changePage(next) {
   page.value = next
   runSearch()
@@ -56,44 +52,29 @@ function safeSnippet(html) {
 
 watch(
   () => route.query.q,
-  (q) => {
-    const next = q || ''
-    if (next !== keyword.value) {
-      keyword.value = next
-      runSearch()
-    }
+  () => {
+    page.value = 1
+    runSearch()
   },
 )
 
 onMounted(() => {
-  keyword.value = route.query.q || ''
   if (keyword.value) runSearch()
 })
 </script>
 
 <template>
   <div class="search-page">
-    <el-input
-      v-model="keyword"
-      size="large"
-      placeholder="输入关键词，支持 +必含词、短语、#标签"
-      clearable
-      @keyup.enter="submit"
-    >
-      <template #append>
-        <el-button @click="submit">搜索</el-button>
-      </template>
-    </el-input>
-
     <div class="summary">
-      <template v-if="keyword && !loading">
-        共 <b>{{ total }}</b> 条结果，耗时 {{ elapsed }} ms
+      <template v-if="keyword">
+        搜索「<b>{{ keyword }}</b>」
+        <template v-if="!loading"> · 共 {{ total }} 条 · 耗时 {{ elapsed }} ms</template>
       </template>
     </div>
 
     <el-skeleton v-if="loading" :rows="4" animated />
 
-    <el-empty v-else-if="!keyword" description="输入关键词开始搜索" />
+    <el-empty v-else-if="!keyword" description="在顶部搜索框输入关键词开始搜索" />
 
     <el-empty v-else-if="!results.length" description="没有找到匹配的笔记" />
 
@@ -140,6 +121,9 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   min-height: 18px;
+}
+.summary b {
+  color: #303133;
 }
 .result-list {
   display: flex;
