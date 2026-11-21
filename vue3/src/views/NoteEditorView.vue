@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -15,6 +15,7 @@ const form = ref({ title: '', content: '', tags: [] })
 const knownTags = ref([])
 const loading = ref(false)
 const saving = ref(false)
+const tagSelectRef = ref(null)
 
 const isEdit = computed(() => Boolean(props.id))
 
@@ -26,14 +27,11 @@ async function loadTags() {
   }
 }
 
-/** 点一下快速标签：已选则取消，未选则加上 */
-function toggleTag(name) {
-  const index = form.tags.indexOf(name)
-  if (index >= 0) {
-    form.tags.splice(index, 1)
-  } else {
-    form.tags.push(name)
-  }
+/** 选中一个标签后收起下拉；要再选就重新点开下拉框 */
+function onTagChange() {
+  nextTick(() => {
+    tagSelectRef.value?.blur()
+  })
 }
 
 async function load() {
@@ -115,35 +113,23 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="tag-block">
-      <div class="tag-line">
-        <span class="tag-label">标签</span>
-        <el-select
-          v-model="form.tags"
-          class="tag-select"
-          multiple
-          filterable
-          allow-create
-          default-first-option
-          :reserve-keyword="false"
-          placeholder="可多选：选已有标签，或输入新标签后回车"
-        >
-          <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
-        </el-select>
-        <span class="tag-count">已选 {{ form.tags.length }} 个</span>
-      </div>
-
-      <div v-if="knownTags.length" class="quick-tags">
-        <span class="quick-label">快速添加</span>
-        <el-check-tag
-          v-for="name in knownTags"
-          :key="name"
-          :checked="form.tags.includes(name)"
-          @change="toggleTag(name)"
-        >
-          {{ name }}
-        </el-check-tag>
-      </div>
+    <div class="tag-line">
+      <span class="tag-label">标签</span>
+      <el-select
+        ref="tagSelectRef"
+        v-model="form.tags"
+        class="tag-select"
+        multiple
+        filterable
+        allow-create
+        default-first-option
+        :reserve-keyword="false"
+        placeholder="选一个标签；要加更多，再点开这里"
+        @change="onTagChange"
+      >
+        <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
+      </el-select>
+      <span class="tag-count">已选 {{ form.tags.length }} 个</span>
     </div>
 
     <div class="editor-body">
@@ -189,16 +175,7 @@ onBeforeUnmount(() => {
   color: #c0c4cc;
 }
 
-/* ---------- 标签区 ---------- */
-.tag-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  padding: 12px 16px;
-}
+/* ---------- 标签行 ---------- */
 .tag-line {
   display: flex;
   align-items: center;
@@ -217,17 +194,6 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #a8abb2;
   white-space: nowrap;
-}
-.quick-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-left: 42px;
-}
-.quick-label {
-  font-size: 12px;
-  color: #a8abb2;
 }
 
 /* ---------- 编辑与预览 ---------- */
