@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 import { createNote, getNote, listTags, updateNote } from '@/api/notes'
 import MarkdownView from '@/components/MarkdownView.vue'
@@ -13,55 +13,52 @@ const props = defineProps({
 const router = useRouter()
 const form = ref({ title: '', content: '', tags: [] })
 const knownTags = ref([])
+const newTag = ref('')
 const loading = ref(false)
 const saving = ref(false)
-
-const NEW_TAG = '__new_tag__'
 
 const isEdit = computed(() => Boolean(props.id))
 
 async function loadTags() {
   try {
-    knownTags.value = (await listTags()).map((tag) => tag.name)
-  } catch {
-    // 标签补全失败不影响编辑
+    const list = await listTags()
+    knownTags.value = list.map((tag) => tag.name)
+  } catch (error) {
+    ElMessage.error(`标签加载失败：${error.message}`)
   }
 }
 
-/** 选中一个标签：加到列表里（下拉菜单点完会自动关闭） */
 function addTag(name) {
   const value = (name || '').trim()
-  if (value && !form.tags.includes(value)) {
-    form.tags.push(value)
-  }
-}
-
-/** 下拉菜单命令分发 */
-async function onCommand(command) {
-  if (command === NEW_TAG) {
-    try {
-      const { value } = await ElMessageBox.prompt('输入新标签名称', '新建标签', {
-        confirmButtonText: '添加',
-        cancelButtonText: '取消',
-        inputPlaceholder: '例如：检索、MySQL',
-        inputValidator: (text) => (text && text.trim() ? true : '标签不能为空'),
-      })
-      addTag(value)
-      // 让新标签下次也能出现在菜单里
-      if (value && !knownTags.value.includes(value.trim())) {
-        knownTags.value.push(value.trim())
-      }
-    } catch {
-      // 用户取消
-    }
+  if (!value) return
+  if (form.value.tags.includes(value)) {
+    ElMessage.info(`「${value}」已经选过了`)
     return
   }
-  addTag(command)
+  form.value.tags.push(value)
+  // 便于排查：选中后可在控制台看到当前标签数组
+  console.debug('[tag] added:', value, '->', [...form.value.tags])
+}
+
+/** 原生 select：选完浏览器自动收起，然后把 value 复位回占位项 */
+function onPick(event) {
+  const value = event.target.value
+  if (value) addTag(value)
+  event.target.value = ''
+}
+
+/** 手动输入新标签 */
+function addNewTag() {
+  const value = newTag.value.trim()
+  if (!value) return
+  addTag(value)
+  if (!knownTags.value.includes(value)) knownTags.value.push(value)
+  newTag.value = ''
 }
 
 function removeTag(name) {
-  const index = form.tags.indexOf(name)
-  if (index >= 0) form.tags.splice(index, 1)
+  const index = form.value.tags.indexOf(name)
+  if (index >= 0) form.value.tags.splice(index, 1)
 }
 
 async function load() {
@@ -142,26 +139,30 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 标签：下拉菜单选一个就关闭；已选标签显示在菜单外 -->
+    <!-- 标签：原生 select 选一个自动收起，标签显示在下面一行 -->
     <div class="tag-block">
       <div class="tag-line">
         <span class="tag-label">标签</span>
 
-        <el-dropdown trigger="click" @command="onCommand">
-          <el-button class="tag-picker-btn">请选择标签</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item v-for="name in knownTags" :key="name" :command="name">
-                {{ name }}
-              </el-dropdown-item>
-              <el-dropdown-item v-if="!knownTags.length" disabled>暂无标签</el-dropdown-item>
-              <el-dropdown-item :command="NEW_TAG" divided>＋ 新建标签</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <select class="tag-native" @change="onPick">
+          <option value="" selected>请选择标签</option>
+          <option v-for="name in knownTags" :key="name" :value="name">{{ name }}</option>
+        </select>
+
+        <span class="tag-divider">|</span>
+
+        <input
+          v-model="newTag"
+          class="tag-input-new"
+          placeholder="新建标签"
+          @keyup.enter="addNewTag"
+        />
+        <el-button size="small" @click="addNewTag">添加</el-button>
+
+        <span class="tag-count">已选 {{ form.tags.length }} 个</span>
       </div>
 
-      <div v-if="form.tags.length" class="tag-chips">
+      <div class="tag-chips">
         <el-tag
           v-for="name in form.tags"
           :key="name"
@@ -170,6 +171,7 @@ onBeforeUnmount(() => {
         >
           {{ name }}
         </el-tag>
+        <span v-if="!form.tags.length" class="tag-empty">还没有选择标签</span>
       </div>
     </div>
 
@@ -226,16 +228,47 @@ onBeforeUnmount(() => {
 .tag-line {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .tag-label {
   font-size: 13px;
   color: #606266;
   white-space: nowrap;
 }
-.tag-picker-btn {
-  min-width: 140px;
-  justify-content: space-between;
+.tag-native {
+  height: 32px;
+  min-width: 160px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #303133;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.tag-native:focus {
+  border-color: #409eff;
+}
+.tag-divider {
+  color: #dcdfe6;
+}
+.tag-input-new {
+  height: 32px;
+  width: 140px;
+  padding: 0 10px;
+  font-size: 13px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  outline: none;
+}
+.tag-input-new:focus {
+  border-color: #409eff;
+}
+.tag-count {
+  font-size: 12px;
+  color: #a8abb2;
 }
 .tag-chips {
   display: flex;
@@ -244,6 +277,10 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   min-height: 24px;
   padding-left: 42px;
+}
+.tag-empty {
+  font-size: 12px;
+  color: #c0c4cc;
 }
 
 /* ---------- 编辑与预览 ---------- */
