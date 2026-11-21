@@ -48,8 +48,13 @@ class Note(Base):
 
     @property
     def full_text(self) -> str:
-        """参与检索的文本：标题权重天然更高（出现两次）。"""
-        return f"{self.title} {self.title} {self.content}"
+        """参与检索的文本。
+
+        标题重复两次用来提高权重；标签名也一并纳入，
+        这样直接搜「后端」也能命中打了 #后端 标签的笔记。
+        """
+        tag_names = " ".join(tag.name for tag in self.tags)
+        return f"{self.title} {self.title} {self.content} {tag_names}"
 
 
 class Tag(Base):

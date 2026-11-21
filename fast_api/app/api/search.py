@@ -1,4 +1,9 @@
-"""检索接口：查询解析 → 倒排索引取候选 → BM25 排序 → 过滤 → 高亮。"""
+"""检索接口：查询解析 → 取候选 → 排序 → 过滤 → 高亮。
+
+两种检索路径：
+1. 有关键词：走倒排索引 + BM25 打分；
+2. 只有 #标签：不参与文本打分，直接按标签把笔记列出来（按更新时间倒序）。
+"""
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -30,6 +35,24 @@ def _collect_terms(parsed) -> list[str]:
     return list(dict.fromkeys(terms))
 
 
+def _notes_by_tags(db: Session, tags: list[str]) -> list[tuple[int, float]]:
+    """纯标签检索：直接按标签取笔记，最近更新的排前面，得分记 0。"""
+    stmt = (
+        select(Note.id)
+        .join(Note.tags)
+        .where(Tag.name.in_(tags))
+        .order_by(Note.updated_at.desc(), Note.id.desc())
+    )
+    seen: set[int] = set()
+    result: list[tuple[int, float]] = []
+    for note_id in db.scalars(stmt).all():
+        if note_id in seen:
+            continue
+        seen.add(note_id)
+        result.append((note_id, 0.0))
+    return result
+
+
 @router.get("/search", response_model=PageOut[SearchHit], summary="全文检索")
 def search_notes(
     q: str = Query(..., min_length=1, description="支持 +必含 / \"短语\" / #标签"),
@@ -45,18 +68,23 @@ def search_notes(
         return empty
 
     index = index_manager.index
-    ranker = BM25Ranker(index)
-    ranked = ranker.search(terms, top_k=2000) if terms else []
+
+    if terms:
+        ranked = BM25Ranker(index).search(terms, top_k=2000)
+    else:
+        # 只有 #标签，没有关键词：按标签列出来即可
+        ranked = _notes_by_tags(db, parsed.tags)
 
     # 1) +必含 词过滤
-    if parsed.must:
-        must_terms = set()
+    if parsed.must and terms:
+        must_terms: set[str] = set()
         for word in parsed.must:
             must_terms.update(index_manager.tokenizer.tokenize(word))
-        ranked = [item for item in ranked if must_terms <= index.doc_terms(item[0])]
+        if must_terms:
+            ranked = [item for item in ranked if must_terms <= index.doc_terms(item[0])]
 
-    # 2) #标签 过滤
-    if parsed.tags:
+    # 2) #标签 过滤（纯标签检索时已经过滤过了）
+    if parsed.tags and terms:
         allowed = set(
             db.scalars(select(Note.id).join(Note.tags).where(Tag.name.in_(parsed.tags))).all()
         )
@@ -66,8 +94,8 @@ def search_notes(
     if parsed.phrases and ranked:
         ids = [doc_id for doc_id, _ in ranked]
         contents = {
-            n.id: f"{n.title}\n{n.content}".lower()
-            for n in db.scalars(select(Note).where(Note.id.in_(ids))).all()
+            note.id: f"{note.title}\n{note.content}".lower()
+            for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()
         }
         ranked = [
             item
@@ -81,23 +109,20 @@ def search_notes(
         return PageOut(total=total, page=page, size=size, items=[])
 
     ids = [doc_id for doc_id, _ in window]
-    notes = {
-        n.id: n for n in db.scalars(select(Note).where(Note.id.in_(ids))).all()
-    }
+    notes = {note.id: note for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()}
 
     hits: list[SearchHit] = []
     for doc_id, score in window:
         note = notes.get(doc_id)
         if note is None:  # 索引与数据库短暂不一致时跳过，而不是抛错
             continue
-        snippet_source = note.content or note.title
         hits.append(
             SearchHit(
                 id=note.id,
                 title=note.title,
-                snippet=highlight(snippet_source, terms),
+                snippet=highlight(note.content or note.title, terms),
                 score=round(score, 4),
-                tags=[t.name for t in note.tags],
+                tags=[tag.name for tag in note.tags],
             )
         )
 
@@ -118,7 +143,7 @@ def related_notes(
         return []
 
     ids = [doc_id for doc_id, _ in pairs]
-    notes = {n.id: n for n in db.scalars(select(Note).where(Note.id.in_(ids))).all()}
+    notes = {note.id: note for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()}
     hits: list[SearchHit] = []
     for doc_id, score in pairs:
         note = notes.get(doc_id)
@@ -130,7 +155,7 @@ def related_notes(
                 title=note.title,
                 snippet=highlight(note.content or note.title, [], context=80),
                 score=round(score, 4),
-                tags=[t.name for t in note.tags],
+                tags=[tag.name for tag in note.tags],
             )
         )
     return hits

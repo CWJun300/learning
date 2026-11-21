@@ -35,9 +35,13 @@ class TestBoundaryInput:
     def test_only_punctuation_returns_empty_list(self):
         assert Tokenizer().tokenize("，。！？；：") == []
 
-    def test_single_chinese_char_is_dropped(self):
-        # 单字信息量太低，视为噪音
+    def test_stopword_single_char_is_dropped(self):
         assert Tokenizer().tokenize("的") == []
+
+    def test_meaningful_single_char_is_kept(self):
+        # 不能因为"只有一个字"就丢掉：jieba 会把「后端」切成「后」「端」，
+        # 一丢就导致这类词彻底搜不到
+        assert Tokenizer().tokenize("写") == ["写"]
 
     def test_stopword_is_filtered(self):
         assert Tokenizer().tokenize("的 苹果") == ["苹果"]

@@ -53,8 +53,8 @@ class Tokenizer:
             piece = piece.strip()
             if not piece or not _CJK.search(piece):
                 continue
-            if len(piece) < 2:  # 单字噪音
-                continue
+            # 注意：这里**不按字数丢弃**。jieba 会把「后端」「倒排」这类词
+            # 切成单字，一旦丢掉就彻底检索不到了，噪音交给停用词表处理。
             tokens.append(piece)
 
         # 3) 停用词

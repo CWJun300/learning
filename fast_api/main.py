@@ -12,6 +12,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import jieba
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +23,7 @@ from sqlalchemy import select
 from app.api import health, notes, search, tags
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Note
+from app.models import Note, Tag
 from app.services.index_manager import index_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -42,7 +43,15 @@ async def lifespan(app: FastAPI):
     index_manager.load()
     try:
         with SessionLocal() as db:
+            tag_names = [tag.name for tag in db.scalars(select(Tag)).all()]
             rows = db.scalars(select(Note)).all()
+
+        # 把已有标签名加进 jieba 词典：否则「后端」会被切成「后」「端」，
+        # 标签检索命中率会明显下降
+        for name in tag_names:
+            if name:
+                jieba.add_word(name)
+
         index_manager.rebuild([(n.id, n.full_text) for n in rows])
         logger.info("索引已从数据库重建：%d 篇笔记，%d 个词条", len(rows), len(index_manager.index.terms()))
     except Exception as exc:  # noqa: BLE001

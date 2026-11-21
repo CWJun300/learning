@@ -169,3 +169,30 @@ class TestTagsAndStats:
         assert body["note_count"] == 1
         assert body["term_count"] > 0
         assert body["avg_note_length"] > 0
+
+
+class TestTagSearch:
+    def test_tag_only_query_returns_notes(self, client):
+        create_note(client, "被标签命中的笔记", "正文随便写", tags=["测试标签甲"])
+        body = client.get("/api/search", params={"q": "#测试标签甲"}).json()
+        assert body["total"] >= 1
+        assert body["items"][0]["title"] == "被标签命中的笔记"
+
+    def test_tag_name_matches_as_plain_text(self, client):
+        """标签名进入索引后，不加 # 直接搜也能命中。"""
+        create_note(client, "普通标题", "正文里没有这个关键词", tags=["postgres"])
+        body = client.get("/api/search", params={"q": "postgres"}).json()
+        assert body["total"] >= 1
+
+    def test_unknown_tag_returns_empty(self, client):
+        create_note(client, "有标签的", "内容", tags=["python"])
+        body = client.get("/api/search", params={"q": "#不存在的标签"}).json()
+        assert body["total"] == 0
+
+    def test_tag_only_query_sorted_by_updated_desc(self, client):
+        first = create_note(client, "先创建", "内容A", tags=["排序测试"]).json()["id"]
+        second = create_note(client, "后创建", "内容B", tags=["排序测试"]).json()["id"]
+        body = client.get("/api/search", params={"q": "#排序测试"}).json()
+        ids = [item["id"] for item in body["items"]]
+        assert ids[0] == second
+        assert set(ids) == {first, second}
