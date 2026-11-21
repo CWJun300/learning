@@ -1,8 +1,8 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { getHealth, listNotes } from '@/api/notes'
+import { getHealth } from '@/api/notes'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,35 +10,15 @@ const router = useRouter()
 const keyword = ref('')
 const health = ref(null)
 
-const notesOpen = ref(false)
-const navNotes = ref([])
-const navLoading = ref(false)
-
-async function loadNavNotes() {
-  navLoading.value = true
-  try {
-    const data = await listNotes({ page: 1, size: 30 })
-    navNotes.value = data.items
-  } catch {
-    // 侧边导航失败不影响主内容
-  } finally {
-    navLoading.value = false
-  }
-}
-
-function toggleNotes() {
-  notesOpen.value = !notesOpen.value
-  if (notesOpen.value) loadNavNotes()
-}
+/** 「笔记」在列表页和详情页时都算选中 */
+const notesActive = computed(
+  () => route.path === '/' || (route.path.startsWith('/notes/') && route.path !== '/notes/new'),
+)
 
 function submit() {
   const q = keyword.value.trim()
   if (!q) return
   router.push({ name: 'search', query: { q } })
-}
-
-function active(path) {
-  return route.path === path
 }
 
 onMounted(async () => {
@@ -47,14 +27,7 @@ onMounted(async () => {
   } catch {
     health.value = null
   }
-  loadNavNotes()
 })
-
-// 新增 / 删除 / 改名后路由会变化，借此刷新侧边列表
-watch(
-  () => route.fullPath,
-  () => loadNavNotes(),
-)
 </script>
 
 <template>
@@ -82,39 +55,13 @@ watch(
       <el-aside width="210px" class="nav-aside">
         <div class="nav-title">导航</div>
 
-        <router-link class="nav-item" :class="{ active: active('/notes/new') }" to="/notes/new">
+        <router-link class="nav-item" :class="{ active: route.path === '/notes/new' }" to="/notes/new">
           新建
         </router-link>
 
-        <div
-          class="nav-item nav-toggle"
-          :class="{ active: notesOpen }"
-          @click="toggleNotes"
-        >
-          <span class="chev" :class="{ open: notesOpen }" />
+        <router-link class="nav-item" :class="{ active: notesActive }" to="/">
           笔记
-          <span class="nav-count">{{ navNotes.length }}</span>
-        </div>
-
-        <div v-if="notesOpen" class="nav-sub">
-          <div v-if="navLoading" class="nav-loading">加载中…</div>
-          <router-link
-            v-for="item in navNotes"
-            :key="item.id"
-            class="nav-subitem"
-            :class="{ active: active(`/notes/${item.id}`) }"
-            :to="`/notes/${item.id}`"
-            :title="item.title"
-          >
-            {{ item.title }}
-          </router-link>
-          <router-link v-if="!navLoading && !navNotes.length" class="nav-subitem nav-more" to="/notes/new">
-            还没有笔记，去写一篇
-          </router-link>
-          <router-link v-if="navNotes.length" class="nav-subitem nav-more" to="/">
-            查看全部
-          </router-link>
-        </div>
+        </router-link>
 
         <div class="nav-footer">
           <el-tag v-if="health" :type="health.db === 'ok' ? 'success' : 'warning'" size="small">
@@ -229,7 +176,6 @@ body {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 6px;
   height: 38px;
   padding: 0 12px;
   border-radius: 6px;
@@ -250,72 +196,6 @@ body {
   font-weight: 600;
 }
 
-.nav-toggle {
-  justify-content: flex-start;
-}
-
-.chev {
-  width: 0;
-  height: 0;
-  border-left: 5px solid currentColor;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  transition: transform 0.18s;
-  flex: 0 0 auto;
-}
-
-.chev.open {
-  transform: rotate(90deg);
-}
-
-.nav-count {
-  margin-left: auto;
-  font-size: 12px;
-  color: #a8abb2;
-  font-weight: 400;
-}
-
-.nav-sub {
-  display: flex;
-  flex-direction: column;
-  padding: 2px 0 6px 18px;
-  max-height: 46vh;
-  overflow-y: auto;
-}
-
-.nav-subitem {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 13px;
-  color: #606266;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nav-subitem:hover {
-  background: #f5f7fa;
-  color: #409eff;
-}
-
-.nav-subitem.active {
-  background: #ecf5ff;
-  color: #409eff;
-}
-
-.nav-more {
-  color: #a8abb2;
-  font-size: 12px;
-}
-
-.nav-loading {
-  font-size: 12px;
-  color: #c0c4cc;
-  padding: 6px 10px;
-}
-
 .nav-footer {
   margin-top: auto;
   padding: 12px 10px 4px;
@@ -324,10 +204,5 @@ body {
 .app-main {
   padding: 20px 24px 40px;
   overflow-y: auto;
-}
-
-/* Element Plus 的 el-aside 默认有背景色，这里覆盖 */
-.el-aside.nav-aside {
-  overflow: visible;
 }
 </style>
