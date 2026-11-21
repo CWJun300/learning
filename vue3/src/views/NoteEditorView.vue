@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -15,7 +15,9 @@ const form = ref({ title: '', content: '', tags: [] })
 const knownTags = ref([])
 const loading = ref(false)
 const saving = ref(false)
-const tagSelectRef = ref(null)
+
+// 下拉框只负责"挑一个"，选中后立刻清空，标签显示在框外
+const pickedTag = ref('')
 
 const isEdit = computed(() => Boolean(props.id))
 
@@ -27,11 +29,18 @@ async function loadTags() {
   }
 }
 
-/** 选中一个标签后收起下拉；要再选就重新点开下拉框 */
-function onTagChange() {
-  nextTick(() => {
-    tagSelectRef.value?.blur()
-  })
+/** 从下拉框选中（或新建）一个标签：加进列表，并清空下拉框 */
+function addTag(value) {
+  const name = (value || '').trim()
+  if (name && !form.tags.includes(name)) {
+    form.tags.push(name)
+  }
+  pickedTag.value = ''
+}
+
+function removeTag(name) {
+  const index = form.tags.indexOf(name)
+  if (index >= 0) form.tags.splice(index, 1)
 }
 
 async function load() {
@@ -115,21 +124,29 @@ onBeforeUnmount(() => {
 
     <div class="tag-line">
       <span class="tag-label">标签</span>
+
       <el-select
-        ref="tagSelectRef"
-        v-model="form.tags"
+        v-model="pickedTag"
         class="tag-select"
-        multiple
         filterable
         allow-create
         default-first-option
-        :reserve-keyword="false"
-        placeholder="选一个标签；要加更多，再点开这里"
-        @change="onTagChange"
+        placeholder="请选择标签"
+        @change="addTag"
       >
         <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
       </el-select>
-      <span class="tag-count">已选 {{ form.tags.length }} 个</span>
+
+      <div v-if="form.tags.length" class="selected-tags">
+        <el-tag
+          v-for="name in form.tags"
+          :key="name"
+          closable
+          @close="removeTag(name)"
+        >
+          {{ name }}
+        </el-tag>
+      </div>
     </div>
 
     <div class="editor-body">
@@ -175,11 +192,12 @@ onBeforeUnmount(() => {
   color: #c0c4cc;
 }
 
-/* ---------- 标签行 ---------- */
+/* ---------- 标签行：下拉框只选一个，标签显示在框外 ---------- */
 .tag-line {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .tag-label {
   font-size: 13px;
@@ -187,13 +205,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .tag-select {
-  flex: 1;
-  max-width: 560px;
+  width: 200px;
+  flex: 0 0 200px;
 }
-.tag-count {
-  font-size: 12px;
-  color: #a8abb2;
-  white-space: nowrap;
+.selected-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* ---------- 编辑与预览 ---------- */
