@@ -26,6 +26,16 @@ async function loadTags() {
   }
 }
 
+/** 点一下快速标签：已选则取消，未选则加上 */
+function toggleTag(name) {
+  const index = form.tags.indexOf(name)
+  if (index >= 0) {
+    form.tags.splice(index, 1)
+  } else {
+    form.tags.push(name)
+  }
+}
+
 async function load() {
   if (!isEdit.value) return
   loading.value = true
@@ -50,11 +60,16 @@ async function save() {
   }
   saving.value = true
   try {
-    const note = isEdit.value
-      ? await updateNote(props.id, form.value)
-      : await createNote(form.value)
-    ElMessage.success(isEdit.value ? '已保存' : '已创建')
-    router.push(`/notes/${note.id}`)
+    if (isEdit.value) {
+      const note = await updateNote(props.id, form.value)
+      ElMessage.success('已保存')
+      router.push(`/notes/${note.id}`)
+    } else {
+      await createNote(form.value)
+      ElMessage.success('已创建')
+      // 新建成功后回到笔记列表
+      router.push('/')
+    }
   } catch (error) {
     ElMessage.error(error.message)
   } finally {
@@ -100,18 +115,36 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <el-select
-      v-model="form.tags"
-      class="tag-select"
-      multiple
-      filterable
-      allow-create
-      default-first-option
-      :reserve-keyword="false"
-      placeholder="输入标签后回车，例如：检索、MySQL（可直接新建）"
-    >
-      <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
-    </el-select>
+    <div class="tag-block">
+      <div class="tag-line">
+        <span class="tag-label">标签</span>
+        <el-select
+          v-model="form.tags"
+          class="tag-select"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          :reserve-keyword="false"
+          placeholder="可多选：选已有标签，或输入新标签后回车"
+        >
+          <el-option v-for="name in knownTags" :key="name" :label="name" :value="name" />
+        </el-select>
+        <span class="tag-count">已选 {{ form.tags.length }} 个</span>
+      </div>
+
+      <div v-if="knownTags.length" class="quick-tags">
+        <span class="quick-label">快速添加</span>
+        <el-check-tag
+          v-for="name in knownTags"
+          :key="name"
+          :checked="form.tags.includes(name)"
+          @change="toggleTag(name)"
+        >
+          {{ name }}
+        </el-check-tag>
+      </div>
+    </div>
 
     <div class="editor-body">
       <div class="pane">
@@ -138,7 +171,7 @@ onBeforeUnmount(() => {
 .editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .editor-head {
   display: flex;
@@ -155,10 +188,49 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #c0c4cc;
 }
-.tag-select {
-  width: 520px;
-  max-width: 100%;
+
+/* ---------- 标签区 ---------- */
+.tag-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 12px 16px;
 }
+.tag-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tag-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+}
+.tag-select {
+  flex: 1;
+  max-width: 560px;
+}
+.tag-count {
+  font-size: 12px;
+  color: #a8abb2;
+  white-space: nowrap;
+}
+.quick-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 42px;
+}
+.quick-label {
+  font-size: 12px;
+  color: #a8abb2;
+}
+
+/* ---------- 编辑与预览 ---------- */
 .editor-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
