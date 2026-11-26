@@ -137,6 +137,107 @@ cd ../fast_api && ../venv/Scripts/python.exe main.py
 
 前端构建产物由 FastAPI 托管，`python main.py` 一条命令即可跑起完整应用。
 
+### 7. 部署到服务器
+
+> ⚠️ **部署前必读：本项目没有登录鉴权**，接口对访问者完全开放。
+> 一旦挂到公网，任何人都能读完你的全部笔记（`GET /api/backup`），
+> 也能删除笔记、恢复备份覆盖数据。**请务必按下面的"安全"一节处理。**
+
+**步骤（以 Linux 服务器为例）**
+
+```bash
+# 1. 拉代码
+git clone <你的仓库> && cd <仓库>/student
+
+# 2. 后端依赖
+python3 -m venv venv
+./venv/bin/pip install -r fast_api/requirements.txt
+
+# 3. 建库（事先装好 MySQL 8 并启动）
+mysql -u root -p < fast_api/scripts/init_db.sql
+
+# 4. 配置
+cp fast_api/.env.example fast_api/.env
+vi fast_api/.env
+#   把 DATABASE_URL 的密码改成真实密码
+#   把 HOST 改成 127.0.0.1（推荐，由 Nginx 反代）或 0.0.0.0
+
+# 5. 构建前端（服务器需要 Node 20+）
+cd vue3 && npm ci && npm run build && cd ..
+#    服务器上没有 Node 的话：在本地 build 后把 vue3/dist 整个目录传上去
+
+# 6. 灌演示数据（可选）
+cd fast_api && ../venv/bin/python scripts/seed_data.py && cd ..
+
+# 7. 启动
+cd fast_api && ../venv/bin/python main.py
+```
+
+**用 systemd 常驻**
+
+```ini
+# /etc/systemd/system/kb.service
+[Unit]
+Description=Personal KB
+After=network.target mysql.service
+
+[Service]
+User=www-data
+WorkingDirectory=/srv/kb/student/fast_api
+ExecStart=/srv/kb/student/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now kb
+```
+
+**⚠️ `--workers` 必须为 1**
+
+倒排索引是**进程内内存对象**，每个 worker 各有一份。开多个 worker 会出现
+"A 进程新增了笔记，B 进程搜不到"的诡异现象。要提升并发，靠前面加缓存或换架构，
+不要直接加 worker。
+
+**安全（公网部署必做，二选一）**
+
+1. **只绑内网 + Nginx 反代加 Basic Auth**（推荐，不改代码）
+
+   ```nginx
+   server {
+       listen 80;
+       server_name kb.example.com;
+       auth_basic "restricted";
+       auth_basic_user_file /etc/nginx/.htpasswd;
+
+       location / {
+           proxy_pass http://127.0.0.1:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+
+   ```bash
+   sudo apt install apache2-utils
+   sudo htpasswd -c /etc/nginx/.htpasswd yourname
+   ```
+
+2. **给写接口加 Token 校验**（需要改代码，可参照 `settings.secret_key`）
+
+**其他注意事项**
+
+| 项目 | 说明 |
+|---|---|
+| `HOST` | 默认 `127.0.0.1`，只监听本机；要对公网直连才改 `0.0.0.0` |
+| `RELOAD` | 生产必须 `0`。开着会 fork 进程，且索引会各存一份 |
+| `/docs` | 公网环境建议关掉：`FastAPI(docs_url=None, openapi_url=None)` |
+| 建表 | 启动时会 `create_all` 兜底，但它**不会改已有表的字段**。改过模型要在服务器上手动 `ALTER` 或重建库 |
+| 备份 | `GET /api/backup` 导出 JSON，`POST /api/backup/restore` 恢复 |
+| 数据体积 | 索引文件在 `fast_api/data/index.json`，随笔记量增长，注意磁盘 |
+
 ## 六、接口一览
 
 启动后访问 `/docs` 可交互调试。

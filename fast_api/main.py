@@ -74,7 +74,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+)#中间件解决跨域
 
 app.include_router(health.router)
 app.include_router(backup.router)

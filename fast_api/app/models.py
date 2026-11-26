@@ -23,11 +23,12 @@ from app.db import Base
 # 笔记正文用 MEDIUMTEXT（最大 16MB），其他数据库退回普通 TEXT
 LongText = Text().with_variant(MEDIUMTEXT(), "mysql")
 NoteId = BigInteger().with_variant(Integer(), "sqlite")
-
+#在内存中声明表结构，并注册到 Base.metadata，尚未与数据库交互
 note_tags = Table(
     "note_tags",
     Base.metadata,
     Column("note_id", BigInteger, ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True),
+    #创建列，参数分别为（列名，数据类型，外键（与之对应的另一个表的列，是否随之更新（ondelete））,是否为主键（非空且唯一））
     Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
 )
 

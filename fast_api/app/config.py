@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
+BACKEND_DIR = Path(__file__).resolve().parents[1]#设置基地址为当前目录往上走两个，即fast_api文件夹
 
 
 class Settings(BaseSettings):

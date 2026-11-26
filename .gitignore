@@ -28,3 +28,12 @@ dist/
 .npm-cache/
 .piptmp/
 **/*-tmp/
+
+# 运行时缓存（jieba 词典缓存约 9MB，每次运行自动重建）
+jieba.cache
+*.cache
+
+# 备份导出文件
+backups/
+*.dump
+kb_db*.sql
