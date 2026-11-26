@@ -227,9 +227,58 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ---
 
+### 路线 D：完全不备案（大陆服务器 + IP + 8443 端口）
+
+**适用**：服务器在中国大陆、没有域名、也不想走备案流程。
+
+备案拦的是「域名 → 80/443」的访问。**直接访问 IP 的非标准端口不涉及域名解析**，
+所以这条路是干净的，不需要任何域名服务。
+
+```bash
+# 1. 生成带 IP 的自签证书（把 IP 换成你的公网 IP）
+sudo mkdir -p /etc/ssl/kb
+sudo openssl req -x509 -nodes -days 825 -newkey rsa:2048 \
+  -keyout /etc/ssl/kb/kb.key \
+  -out    /etc/ssl/kb/kb.crt \
+  -subj "/CN=kb" \
+  -addext "subjectAltName=IP:你的服务器公网IP"
+
+sudo chmod 600 /etc/ssl/kb/kb.key
+
+# 2. 用 IP 专用配置（监听 8443，不占 80/443）
+sudo cp /srv/kb/student/deploy/nginx-kb-ip.conf /etc/nginx/sites-available/kb.conf
+sudo vi /etc/nginx/sites-available/kb.conf    # 把 YOUR_SERVER_IP 换成你的 IP
+
+sudo ln -sf /etc/nginx/sites-available/kb.conf /etc/nginx/sites-enabled/kb.conf
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+
+# 3. 建账号密码
+sudo htpasswd -c /etc/nginx/.htpasswd share
+sudo systemctl reload nginx
+
+# 4. 云安全组/防火墙放行 8443
+sudo ufw allow 8443/tcp        # 用 ufw 的话
+# 云厂商控制台也要加入站规则：TCP 8443
+```
+
+手机访问：`https://你的IP:8443`
+
+- 第一次会提示**"证书不受信任"** → 点「高级」→「继续访问」
+- 之后浏览器会记住，不再提示
+- 输 Basic Auth 账号密码 → 进入应用
+
+**三个注意事项**：
+
+1. **微信/QQ 内置浏览器通常不允许跳过证书警告**，会直接白屏。一定用**系统浏览器**（Safari / Chrome）
+2. 自签证书 825 天（约 2 年）后过期，到期重新生成一次即可
+3. 想彻底消除警告，只有两条路：换境外服务器用 DuckDNS 真证书，或者去备案
+
 ## 步骤 4：手机验证（1 分钟）
 
-1. 手机浏览器打开 `https://你的域名`
+1. 手机浏览器打开你的地址
+   - 路线 A / B：`https://你的域名`
+   - 路线 C / D（IP + 自签证书）：`https://你的IP:8443`，先点「高级 → 继续访问」
 2. 弹出登录框 → 输入刚才 `htpasswd` 设的账号密码
 3. 勾选"记住密码"
 4. 浏览器菜单 → **添加到主屏幕**，以后像 App 一样点开
