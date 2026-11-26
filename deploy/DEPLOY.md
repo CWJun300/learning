@@ -11,7 +11,7 @@
 | 检查项 | 怎么查 | 不满足怎么办 |
 |---|---|---|
 | 服务器有公网 IP | `curl -s ifconfig.me` | 内网机器需要端口转发或云厂商的隧道 |
-| 有域名 | — | 没有也能做，走[自签证书](#路线-b没有域名自签证书) |
+| 有域名 | — | 没有也能做：走步骤 3 的**路线 B**（免费子域名）或**路线 C**（自签证书） |
 | 能装 nginx | `sudo apt install nginx` | — |
 | 服务器在国内 | — | **域名未备案会被封 80/443**，见文末[国内服务器](#国内服务器的两个坑) |
 
@@ -151,7 +151,56 @@ certbot 会自动改写 nginx 配置里的证书路径，**`nginx-kb.conf` 里�
 sudo certbot renew --dry-run
 ```
 
-### 路线 B：没有域名（自签证书）
+### 路线 B：没有域名 → 用免费子域名（推荐）
+
+不用买域名，也不用掏钱，拿到**浏览器信任的证书**（地址栏有小锁，手机不报警告）。
+
+**B1：DuckDNS（稳定，推荐）**
+
+1. 打开 https://www.duckdns.org ，用 GitHub/Google 登录
+2. 建一个子域名，比如 `mykb` → 得到 `mykb.duckdns.org`
+3. 把它的 IP 填成你服务器的公网 IP（页面上直接输入保存）
+4. 等 1 分钟生效，验证：
+
+```bash
+dig +short mykb.duckdns.org     # 应该返回你的服务器 IP
+```
+
+5. 签证书（和路线 A 完全一样，只是换个域名）：
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d mykb.duckdns.org
+```
+
+`nginx-kb.conf` 里的 `server_name` 改成 `mykb.duckdns.org` 即可。
+
+**B2：sslip.io（零注册，立刻可用）**
+
+如果连注册都不想，`sslip.io` 能把 IP 直接变成域名：
+
+```
+你的IP 1.2.3.4  →  1-2-3-4.sslip.io     （横线写法，避免和子域名混淆）
+                 或 1.2.3.4.sslip.io
+```
+
+```bash
+# 先验证解析
+dig +short 1-2-3-4.sslip.io
+
+# 签证书
+sudo certbot --nginx -d 1-2-3-4.sslip.io
+```
+
+**注意**：sslip.io 是公共解析服务，域名不算你"拥有"，只适合个人临时使用；
+DuckDNS 更稳，长期用建议 B1。
+
+**⚠️ 服务器在中国大陆的话，这两招都走不通**
+
+未备案的域名指向境内服务器，80/443 会被运营商拦截。这种情况只能：
+用 IP + 自签证书（路线 C，走非标准端口 8443），或者只做 SSH 隧道。
+
+### 路线 C：连免费子域名都不想弄（自签证书）
 
 手机能访问，但**第一次会弹"不安全"警告**，点"继续访问"即可。数据依然是加密的。
 
