@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getHealth } from '@/api/notes'
@@ -12,7 +12,7 @@ const health = ref(null)
 
 /** 「笔记」在列表页和详情页时都算选中 */
 const notesActive = computed(
-  () => route.path === '/' || (route.path.startsWith('/notes/') && route.path !== '/notes/new'),
+  () => route.path === '/notes' || (route.path.startsWith('/notes/') && route.path !== '/notes/new'),
 )
 
 function submit() {
@@ -21,13 +21,16 @@ function submit() {
   router.push({ name: 'search', query: { q } })
 }
 
-onMounted(async () => {
+async function refreshHealth() {
   try {
     health.value = await getHealth()
   } catch {
     health.value = null
   }
-})
+}
+
+provide('refreshHealth', refreshHealth)
+watch(() => route.path, refreshHealth, { immediate: true })
 </script>
 
 <template>
@@ -55,19 +58,25 @@ onMounted(async () => {
       <el-aside width="210px" class="nav-aside">
         <div class="nav-title">导航</div>
 
+        <router-link class="nav-item" :class="{active: route.path === '/' || route.path.startsWith('/topics/')}" to="/">
+          学习首页
+        </router-link>
+        <router-link class="nav-item" active-class="active" to="/review">自测复习</router-link>
+
         <router-link class="nav-item" :class="{ active: route.path === '/notes/new' }" to="/notes/new">
           新建
         </router-link>
 
         <router-link class="nav-item" :class="{ active: route.path === '/import' }" to="/import">
-          导入
+          导入与备份
         </router-link>
 
-        <router-link class="nav-item" :class="{ active: notesActive }" to="/">
-          笔记
+        <router-link class="nav-item" :class="{ active: notesActive }" to="/notes">
+          全部笔记
         </router-link>
 
         <div class="nav-footer">
+          <router-link class="nav-item" active-class="active" to="/trash">回收站</router-link>
           <el-tag v-if="health" :type="health.db === 'ok' ? 'success' : 'warning'" size="small">
             {{ health.db === 'ok' ? `已连接 · ${health.index_docs} 篇` : '数据库未连接' }}
           </el-tag>
@@ -75,7 +84,7 @@ onMounted(async () => {
       </el-aside>
 
       <el-main class="app-main">
-        <router-view />
+        <router-view :key="route.path" />
       </el-main>
     </el-container>
   </el-container>

@@ -17,6 +17,8 @@ def list_tags(db: Session = Depends(get_db)) -> list[TagCount]:
     stmt = (
         select(Tag.name, func.count(note_tags.c.note_id).label("cnt"))
         .join(note_tags, Tag.id == note_tags.c.tag_id)
+        .join(Note, Note.id == note_tags.c.note_id)
+        .where(Note.active())
         .group_by(Tag.name)
         .order_by(func.count(note_tags.c.note_id).desc(), Tag.name)
     )
@@ -25,7 +27,7 @@ def list_tags(db: Session = Depends(get_db)) -> list[TagCount]:
 
 @router.get("/stats", response_model=StatsOut, summary="知识库统计")
 def stats(db: Session = Depends(get_db)) -> StatsOut:
-    note_count = db.scalar(select(func.count(Note.id))) or 0
+    note_count = db.scalar(select(func.count(Note.id)).where(Note.active())) or 0
     index = index_manager.index
     if note_count:
         avg_len = sum(index.doc_length(nid) for nid in index.doc_ids()) / note_count

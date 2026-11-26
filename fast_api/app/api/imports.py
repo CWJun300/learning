@@ -40,7 +40,7 @@ def import_notes(payload: ImportRequest, db: Session = Depends(get_db)) -> Impor
             titles=[],
         )
 
-    existing_titles = set(db.scalars(select(Note.title)).all())
+    existing_titles = set(db.scalars(select(Note.title).where(Note.active())).all())
     created: list[Note] = []
 
     for item in payload.files:
@@ -74,11 +74,7 @@ def import_notes(payload: ImportRequest, db: Session = Depends(get_db)) -> Impor
             existing_titles.add(title)
             imported_titles.append(title)
 
-    db.commit()
-
-    # 数据库提交成功后再更新内存索引
-    for note in created:
-        index_manager.add_note(note.id, note.full_text)
+    index_manager.commit_notes(db, created)
 
     return ImportResult(
         imported=len(imported_titles),

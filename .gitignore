@@ -28,6 +28,3 @@ dist/
 .npm-cache/
 .piptmp/
 **/*-tmp/
-
-# 离线依赖包（约 25MB，体积大不入库）
-tools/_wheels/

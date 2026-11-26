@@ -14,8 +14,8 @@ if str(ROOT) not in sys.path:
 
 from sqlalchemy import select  # noqa: E402
 
-from app.db import SessionLocal  # noqa: E402
-from app.models import Note, Tag  # noqa: E402
+from app.db import SessionLocal, engine  # noqa: E402
+from app.models import Note, Tag, TrashedNote  # noqa: E402
 from app.services.index_manager import index_manager  # noqa: E402
 
 NOTES = [
@@ -244,6 +244,7 @@ def get_or_create_tag(db, name: str) -> Tag:
 
 
 def main() -> int:
+    TrashedNote.__table__.create(engine, checkfirst=True)
     added = 0
     skipped = 0
     with SessionLocal() as db:
@@ -259,7 +260,7 @@ def main() -> int:
         db.commit()
 
     with SessionLocal() as db:
-        rows = db.scalars(select(Note)).all()
+        rows = db.scalars(select(Note).where(Note.active())).all()
         index_manager.rebuild([(note.id, note.full_text) for note in rows])
 
     index_manager.save()

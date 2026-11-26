@@ -20,9 +20,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
-from app.api import health, imports, notes, search, tags
+from app.api import backup, health, imports, notes, search, study, tags
 from app.config import settings
-from app.db import SessionLocal
+from app.db import Base, SessionLocal, engine
 from app.models import Note, Tag
 from app.services.index_manager import index_manager
 
@@ -42,9 +42,10 @@ async def lifespan(app: FastAPI):
     """
     index_manager.load()
     try:
+        Base.metadata.create_all(engine)
         with SessionLocal() as db:
             tag_names = [tag.name for tag in db.scalars(select(Tag)).all()]
-            rows = db.scalars(select(Note)).all()
+            rows = db.scalars(select(Note).where(Note.active())).all()
 
         # 把已有标签名加进 jieba 词典：否则「后端」会被切成「后」「端」，
         # 标签检索命中率会明显下降
@@ -76,6 +77,8 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(backup.router)
+app.include_router(study.router)
 app.include_router(notes.router)
 app.include_router(imports.router)
 app.include_router(search.router)

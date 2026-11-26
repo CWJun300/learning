@@ -38,6 +38,21 @@ class NoteOut(BaseModel):
     tags: list[TagOut] = Field(default_factory=list)
 
 
+class NoteReference(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+
+
+class NoteLinks(BaseModel):
+    outgoing: list[NoteReference]
+    incoming: list[NoteReference]
+
+
+class TrashItem(NoteReference):
+    deleted_at: datetime
+
+
 class TagCount(BaseModel):
     name: str
     count: int

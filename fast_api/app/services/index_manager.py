@@ -6,11 +6,17 @@
 """
 
 import threading
+from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.config import settings
 from app.services.index_store import IndexLoadError, InvertedIndex
 from app.services.tokenizer import Tokenizer
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    from app.models import Note
 
 
 class IndexManager:
@@ -43,6 +49,17 @@ class IndexManager:
             self._index.save(self._path)
 
     # ---------- 增删改 ----------
+    def commit_notes(self, db: "Session", notes: Iterable["Note"] = (), removed: Iterable[int] = ()) -> None:
+        """让数据库提交和内存更新顺序一致，避免并发删除与恢复留下过期索引。"""
+        db.flush()
+        documents = [(note.id, note.full_text) for note in notes]
+        with self._lock:
+            db.commit()
+            for note_id in removed:
+                self._index.remove(note_id)
+            for note_id, content in documents:
+                self._index.update(note_id, content)
+
     def add_note(self, note_id: int, text: str) -> None:
         with self._lock:
             self._index.add(note_id, text)

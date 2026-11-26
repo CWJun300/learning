@@ -95,6 +95,8 @@ def parse_json(filename: str, text: str) -> list[ParsedNote]:
         raise ValueError(f"JSON 解析失败：{exc.msg}") from exc
 
     if isinstance(data, dict):
+        if data.get("format") == "personal-kb":
+            raise ValueError("这是整库备份，请使用「恢复备份」以保留引用和回收站状态")
         items = data["notes"] if isinstance(data.get("notes"), list) else [data]
     elif isinstance(data, list):
         items = data

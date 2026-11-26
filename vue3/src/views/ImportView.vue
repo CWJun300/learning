@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { importNotes } from '@/api/notes'
+import BackupPanel from '@/components/BackupPanel.vue'
 
 const router = useRouter()
 
@@ -90,6 +91,7 @@ function formatSize(bytes) {
 
 <template>
   <div class="import-page">
+    <BackupPanel />
     <h2 class="title">批量导入笔记</h2>
 
     <div
@@ -146,7 +148,7 @@ function formatSize(bytes) {
         </div>
       </div>
 
-      <el-button v-if="result.imported > 0" type="primary" plain @click="router.push('/')">
+      <el-button v-if="result.imported > 0" type="primary" plain @click="router.push('/notes')">
         去看看导入的笔记
       </el-button>
     </div>

@@ -12,6 +12,14 @@ export const updateNote = (id, payload) => http.put(`/notes/${id}`, payload)
 
 export const deleteNote = (id) => http.delete(`/notes/${id}`)
 
+export const getLinks = (id) => http.get(`/notes/${id}/links`)
+export const suggestNotes = (q) => http.get('/notes/suggestions', { params: { q } })
+export const listTrash = (page) => http.get('/notes/trash', { params: { page } })
+export const restoreNote = (id) => http.post(`/notes/${id}/restore`)
+export const restoreBackup = (json) => http.post('/backup/restore', json, {
+  timeout: 120000, headers: { 'Content-Type': 'application/json' },
+})
+
 export const searchNotes = (params = {}) => http.get('/search', { params })
 
 export const listTags = () => http.get('/tags')

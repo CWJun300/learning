@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { createNote, getNote, listTags, updateNote } from '@/api/notes'
 import MarkdownView from '@/components/MarkdownView.vue'
+import LinkedNoteInput from '@/components/LinkedNoteInput.vue'
 
 const props = defineProps({
   id: { type: String, default: '' },
@@ -92,7 +93,7 @@ async function save() {
     } else {
       await createNote(form.value)
       ElMessage.success('已创建')
-      router.push('/')
+      router.push('/notes')
     }
   } catch (error) {
     ElMessage.error(error.message)
@@ -178,13 +179,7 @@ onBeforeUnmount(() => {
     <div class="editor-body">
       <div class="pane">
         <div class="pane-title">Markdown</div>
-        <el-input
-          v-model="form.content"
-          type="textarea"
-          :rows="22"
-          resize="none"
-          placeholder="支持 Markdown 语法，右侧实时预览"
-        />
+        <LinkedNoteInput v-model="form.content" />
       </div>
       <div class="pane">
         <div class="pane-title">预览</div>

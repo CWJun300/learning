@@ -40,7 +40,7 @@ def _notes_by_tags(db: Session, tags: list[str]) -> list[tuple[int, float]]:
     stmt = (
         select(Note.id)
         .join(Note.tags)
-        .where(Tag.name.in_(tags))
+        .where(Tag.name.in_(tags), Note.active())
         .order_by(Note.updated_at.desc(), Note.id.desc())
     )
     seen: set[int] = set()
@@ -86,7 +86,7 @@ def search_notes(
     # 2) #标签 过滤（纯标签检索时已经过滤过了）
     if parsed.tags and terms:
         allowed = set(
-            db.scalars(select(Note.id).join(Note.tags).where(Tag.name.in_(parsed.tags))).all()
+            db.scalars(select(Note.id).join(Note.tags).where(Note.active(), Tag.name.in_(parsed.tags))).all()
         )
         ranked = [item for item in ranked if item[0] in allowed]
 
@@ -95,7 +95,7 @@ def search_notes(
         ids = [doc_id for doc_id, _ in ranked]
         contents = {
             note.id: f"{note.title}\n{note.content}".lower()
-            for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()
+            for note in db.scalars(select(Note).where(Note.active(), Note.id.in_(ids))).all()
         }
         ranked = [
             item
@@ -109,7 +109,7 @@ def search_notes(
         return PageOut(total=total, page=page, size=size, items=[])
 
     ids = [doc_id for doc_id, _ in window]
-    notes = {note.id: note for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()}
+    notes = {note.id: note for note in db.scalars(select(Note).where(Note.active(), Note.id.in_(ids))).all()}
 
     hits: list[SearchHit] = []
     for doc_id, score in window:
@@ -143,7 +143,7 @@ def related_notes(
         return []
 
     ids = [doc_id for doc_id, _ in pairs]
-    notes = {note.id: note for note in db.scalars(select(Note).where(Note.id.in_(ids))).all()}
+    notes = {note.id: note for note in db.scalars(select(Note).where(Note.active(), Note.id.in_(ids))).all()}
     hits: list[SearchHit] = []
     for doc_id, score in pairs:
         note = notes.get(doc_id)

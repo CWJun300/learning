@@ -11,6 +11,7 @@ cryptography>=43
 pydantic>=2.9
 pydantic-settings>=2.5
 python-dotenv>=1.0
+markdown-it-py>=3
 
 # 中文分词
 jieba==0.42.1

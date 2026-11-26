@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
 
 import { searchNotes } from '@/api/notes'
+import TopicPicker from '@/components/TopicPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,14 @@ const page = ref(1)
 const size = 10
 const loading = ref(false)
 const elapsed = ref(0)
+const selected = ref([])
+const picking = ref(false)
+
+function toggle(note) {
+  const index = selected.value.findIndex(item => item.id === note.id)
+  if (index < 0) selected.value.push({ id: note.id, title: note.title })
+  else selected.value.splice(index, 1)
+}
 
 /** 关键词直接取自地址栏（搜索框在顶栏，全站唯一） */
 const keyword = computed(() => (route.query.q || '').toString())
@@ -72,6 +81,12 @@ onMounted(() => {
       </template>
     </div>
 
+    <div v-if="results.length || selected.length">
+      <el-button :disabled="!selected.length" @click="picking = true">加入专题（{{ selected.length }}）</el-button>
+    </div>
+    <TopicPicker v-if="picking" choose-topic :initial="selected" @close="picking = false"
+      @saved="id => router.push('/topics/' + id)" />
+
     <el-skeleton v-if="loading" :rows="4" animated />
 
     <el-empty v-else-if="!keyword" description="在顶部搜索框输入关键词开始搜索" />
@@ -86,6 +101,8 @@ onMounted(() => {
         @click="router.push(`/notes/${item.id}`)"
       >
         <div class="result-head">
+          <label @click.stop><input type="checkbox" :aria-label="'选择 ' + item.title"
+            :checked="selected.some(n => n.id === item.id)" @change="toggle(item)" /></label>
           <span class="result-title">{{ item.title }}</span>
           <!-- 纯标签检索没有文本得分，不显示 0.00 -->
           <span v-if="item.score > 0" class="result-score">{{ item.score.toFixed(2) }}</span>
