@@ -139,6 +139,10 @@ cd ../fast_api && ../venv/Scripts/python.exe main.py
 
 ### 7. 部署到服务器
 
+> 📦 **手机访问 / 多人共用**：直接照 [deploy/DEPLOY.md](deploy/DEPLOY.md) 走，
+> 里面有 Nginx 配置、systemd 服务、Basic Auth 账号、HTTPS 证书的完整步骤（约 10 分钟），
+> 以及安全检查清单和排错表。`deploy/` 下已放好可直接复制的 `nginx-kb.conf` 和 `kb.service`。
+
 > ⚠️ **部署前必读：本项目没有登录鉴权**，接口对访问者完全开放。
 > 一旦挂到公网，任何人都能读完你的全部笔记（`GET /api/backup`），
 > 也能删除笔记、恢复备份覆盖数据。**请务必按下面的"安全"一节处理。**
