@@ -41,6 +41,25 @@ class Settings(BaseSettings):
     def resolve_index_path(cls, path: Path) -> Path:
         return BACKEND_DIR / path
 
+    @field_validator("database_url", "test_database_url")
+    @classmethod
+    def resolve_sqlite_path(cls, url: str) -> str:
+        """把 SQLite 的相对路径固定到 fast_api 目录下。
+
+        否则 `sqlite:///./kb.db` 会跟着启动目录跑：在 fast_api 里启动是一个文件，
+        在仓库根目录启动又变另一个，数据像"丢了"。
+        """
+        prefix = "sqlite:///"
+        # 内存库、已写绝对路径（sqlite:////srv/x.db 或 sqlite:///C:/x.db）直接放行
+        if not url.startswith(prefix) or url.startswith("sqlite:////") or ":memory:" in url:
+            return url
+
+        raw = url[len(prefix) :]
+        path = Path(raw)
+        if not raw or path.is_absolute():
+            return url
+        return prefix + (BACKEND_DIR / path).resolve().as_posix()
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

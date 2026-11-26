@@ -37,3 +37,7 @@ jieba.cache
 backups/
 *.dump
 kb_db*.sql
+# SQLite 运行文件（含 WAL 附属文件）
+*.db-wal
+*.db-shm
+*.db-journal

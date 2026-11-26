@@ -20,16 +20,17 @@ if str(ROOT) not in sys.path:
 
 
 def _make_engine():
-    from sqlalchemy import create_engine, text
+    """复用应用的引擎构造，保证 SQLite 的 PRAGMA / 事务设置与生产一致。
+
+    测试用 NullPool：每个用例拿新连接，避免连接级状态串到下一个用例。
+    """
+    from sqlalchemy import text
     from sqlalchemy.pool import NullPool
 
     from app.config import settings
+    from app.db import _build_engine
 
-    engine = create_engine(
-        settings.test_database_url,
-        poolclass=NullPool,
-        pool_pre_ping=True,
-    )
+    engine = _build_engine(settings.test_database_url, poolclass=NullPool)
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
     return engine

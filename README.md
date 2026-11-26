@@ -195,6 +195,28 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload && sudo systemctl enable --now kb
 ```
 
+**没有 MySQL 的服务器：改用 SQLite**
+
+代码已支持，改 `.env` 两行即可（相对路径按 `fast_api` 目录解析，与启动目录无关）：
+
+```ini
+DATABASE_URL=sqlite:///./kb.db
+TEST_DATABASE_URL=sqlite:///./kb_test.db
+```
+
+启动时会自动建表（`Base.metadata.create_all`），**不需要跑 `init_db.sql`**。
+
+| 要点 | 说明 |
+|---|---|
+| 数据文件 | `fast_api/kb.db`，备份就是拷这个文件（或用 `GET /api/backup` 导 JSON） |
+| WAL 附属文件 | 运行时还会生成 `kb.db-wal` / `kb.db-shm`，拷贝备份时一并带走，或先停服务 |
+| 并发 | SQLite 是单写者，写操作串行；个人使用够用，多人高并发不建议 |
+| 外键 | 代码已开 `PRAGMA foreign_keys=ON`，否则 `ON DELETE CASCADE` 不会生效 |
+| 事务 | 已关闭 pysqlite 的隐式 BEGIN 改由显式 BEGIN，保证事务/保存点语义正确 |
+| 从 MySQL 迁移 | `GET /api/backup` 导出 JSON → 改 `.env` → 重启 → `POST /api/backup/restore` 导入 |
+
+已在 SQLite 上验证：136 个测试全部通过，建表、灌数据、检索、软删除、级联均正常。
+
 **⚠️ `--workers` 必须为 1**
 
 倒排索引是**进程内内存对象**，每个 worker 各有一份。开多个 worker 会出现
